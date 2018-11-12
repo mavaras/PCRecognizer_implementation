@@ -1,0 +1,148 @@
+<!DOCTYPE html lang=ES>
+<html>
+<head>
+	<title>PCRecognizer</title>
+	<meta charset="utf-8" />
+	<link rel="stylesheet" href="style.css"/>
+	<link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro" rel="stylesheet"> 
+	<script type="text/javascript" src = "PCRecognizer.js"></script>
+	<script type="text/javascript" src = "http://code.jquery.com/jquery-1.11.3.min.js"></script>
+	<script type="text/javascript">
+		// Script for handling mouse events and draw stuff
+		var canvas, ctx, stroke_id, canvas_rect, pdr;
+		var prev_x, prev_y, x, y;
+		var clicked;
+
+		function on_load_event() {
+			points = new Array(); // for current stroke
+			stroke_id = 0;
+			clicked = false;
+			pdr = new PDollarRecognizer();
+
+			canvas = document.getElementById("canvas");
+			ctx = canvas.getContext("2d");
+			ctx.lineWidth = 5.5;
+			canvas_rect = get_canvas_rect(canvas);
+		}
+
+		function get_canvas_rect(canvas) {
+			var w = canvas.width;
+			var h = canvas.height;
+			console.log(w+" "+h);
+			var canvas_x = canvas.offsetLeft;
+			var canvas_y = canvas.offsetTop;
+			while(canvas.offsetParent != null) {
+				canvas = canvas.offsetParent;
+				canvas_x += canvas.offsetLeft;
+				canvas_y += canvas.offsetTop;
+			}
+
+			return {x: canvas_x, y: canvas_y, width: w, height: h};
+		}
+
+		function mouse_down_event(x, y, button) {
+			document.onselectstart = function() { return false; }
+			document.onmousedown = function() { return false; }
+			if(button <= 1) {
+				clicked = true;
+				x -= canvas_rect.x - get_scroll_X();
+				y -= canvas_rect.y - get_scroll_Y();
+				if(stroke_id == 0) {
+					points.length = 0;
+					ctx.clearRect(0, 0, canvas_rect.width, canvas_rect.height);
+				}
+				points[points.length] = new Point(x, y, ++stroke_id);
+
+				console.log("begin point: "+points[points.length-1].x+", "+points[points.length-1].y);
+				ctx.strokeStyle = "black";
+				ctx.fillStyle = "black";
+				ctx.fillRect(x, y, 10, 10);
+			}
+		} 
+
+		function mouse_move_event(x, y, button) {
+			if(clicked) {
+				x -= canvas_rect.x - get_scroll_X();
+				y -= canvas_rect.y - get_scroll_Y();
+				points[points.length] = new Point(x, y, stroke_id);
+				// draw line between current point and previous one. It's very important the direction!!!!!
+				draw_line_between_points(points.length - 2, points.length - 1);
+			}
+		}
+
+		function mouse_up_event(x, y, button) {
+			document.onselectstart = function() { return true; }
+			document.onmousedown = function() { return true; }
+			if(button <= 1 && clicked) {
+				clicked = false;
+				x -= canvas_rect.x;
+				y -= canvas_rect.y;
+				console.log("end point: "+x+", "+y);
+				//ctx.fillRect(x, y, 10, 10);
+			}
+			else if(button == 2) {
+				if(points.length >= 10) {
+					clicked = false;
+					var result = pdr.recognize(points);
+					ctx.fillStyle = "blue";
+					ctx.font = "20px Arial";
+					ctx.fillText("Result: matched with "+result.Name+" - "+round(result.score, 2)+"% in "+result.time+"ms", 20, canvas_rect.height - 20);
+					//ctx.fillText("Result: "+result.Name, 1, 14);
+				}
+				stroke_id = 0;
+			}
+		}
+
+		function round(n, d) {
+			d = Math.pow(10, d);
+			return Math.round(n * d) / d;
+		}
+
+		function draw_line_between_points(p1, p2) {
+			ctx.beginPath();
+			ctx.moveTo(points[p1].x, points[p1].y);
+			ctx.lineTo(points[p2].x, points[p2].y);
+			ctx.closePath();
+			ctx.stroke();
+		}
+
+		function get_scroll_X() { return $(window).scrollLeft(); }
+		function get_scroll_Y() { return $(window).scrollTop(); }
+
+		function clear_canvas() {
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+		}
+	</script>
+</head>
+<body onload = "on_load_event()">
+	<h1>
+		Implementation of PCRecognizer
+	</h1>
+	
+	<canvas id = "canvas" width="500" height="500"
+		onmousedown = "mouse_down_event(event.clientX, 
+		event.clientY, event.button)"
+		onmousemove = "mouse_move_event(event.clientX, 
+		event.clientY, event.button)"
+		onmouseup = "mouse_up_event(event.clientX, 
+		event.clientY, event.button)"
+		oncontextmenu = "return false;">
+	</canvas>
+	<table>
+	<tr id = "buttons">
+		<td><button id="button" align="left" type="button" onclick="clear_canvas();">clear</button></td>
+	</tr>
+	<tr>
+		<p>Right click to recognize. Templates: T, D, N</p>
+	</tr>
+	</table>
+
+	<hr>
+	<footer>
+		<p>
+			coded by M Varas
+			fully based on <a href="https://depts.washington.edu/madlab/proj/dollar/pdollar.html">$P Point-Cloud Recognizer algorithm</a> by Radu-Daniel Vatavu, Lisa Anthony and Jacob O. Wobbrock
+		</p>
+	</footer>
+</body>
+</html>
